@@ -1,0 +1,54 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: poultry
+      POSTGRES_PASSWORD: poultry
+      POSTGRES_DB: poultry_market
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/dev/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poultry -d poultry_market"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://poultry:poultry@db:5432/poultry_market"
+      DATABASE_SYNC_URL: "postgresql+psycopg2://poultry:poultry@db:5432/poultry_market"
+      DEBUG: "true"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+    depends_on:
+      - backend
+
+  ai-engine:
+    build: ./ai-engine
+    environment:
+      DATABASE_URL: "postgresql+psycopg2://poultry:poultry@db:5432/poultry_market"
+    volumes:
+      - ./ai-engine:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
