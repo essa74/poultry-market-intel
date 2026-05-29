@@ -16,7 +16,10 @@ def _ensure_asyncpg(url: str) -> str:
 
 
 def _to_sync_url(url: str) -> str:
-    return url.replace("+asyncpg", "+psycopg2")
+    url = url.replace("+asyncpg", "+psycopg2")
+    # psycopg2 uses sslmode= instead of ssl=
+    url = url.replace("ssl=require", "sslmode=require")
+    return url
 
 
 class Settings(BaseSettings):
