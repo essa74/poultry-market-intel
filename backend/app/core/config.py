@@ -9,7 +9,9 @@ _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 
 def _ensure_asyncpg(url: str) -> str:
     if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # asyncpg uses ssl= instead of sslmode=
+    url = url.replace("sslmode=require", "ssl=require")
     return url
 
 
