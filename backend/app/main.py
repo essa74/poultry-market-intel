@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.api import router
 from app.db.session import async_session
-from app.services.scrapers import start_scheduler, stop_scheduler
+from app.services.scrapers import start_scheduler, stop_scheduler, seed_default_sources
 from app.services.holiday_calendar_service import seed_holidays
 from app.services.news_scraper import refresh_all_news
 
@@ -35,9 +35,10 @@ async def lifespan(app: FastAPI):
 
     try:
         async with async_session() as db:
+            await seed_default_sources(db)
             await seed_holidays(db)
     except Exception as e:
-        logger.warning(f"Holiday seeding skipped: {e}")
+        logger.warning(f"Startup seeding skipped: {e}")
 
     yield
     logger.info("Shutting down — stopping scheduler...")
