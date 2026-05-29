@@ -3,6 +3,27 @@ from datetime import date, datetime
 from typing import Optional
 
 
+class HolidayEventCreate(BaseModel):
+    name_ar: str = Field(..., example="شهر رمضان")
+    name_en: str = Field(..., example="Ramadan")
+    event_type: str = Field(..., example="ramadan")
+    start_date: date
+    end_date: date
+    impact_description: Optional[str] = None
+    impact_percentage: Optional[float] = None
+    affected_products: Optional[list[str]] = None
+    notes: Optional[str] = None
+
+
+class HolidayEventResponse(HolidayEventCreate):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class PriceRecordCreate(BaseModel):
     product_type: str = Field(..., example="fertilized_eggs")
     category: str = Field(..., example="white")
@@ -13,6 +34,8 @@ class PriceRecordCreate(BaseModel):
     region: Optional[str] = None
     recorded_date: date
     source: Optional[str] = None
+    raw_product_name: Optional[str] = None
+    product_group: Optional[str] = None
 
 
 class PriceRecordResponse(PriceRecordCreate):

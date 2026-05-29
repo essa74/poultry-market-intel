@@ -21,12 +21,20 @@ CREATE INDEX idx_price_records_product_date ON price_records(product_type, recor
 
 CREATE TABLE IF NOT EXISTS holiday_calendar (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    date DATE NOT NULL UNIQUE,
-    holiday_type VARCHAR(50) NOT NULL,
-    description VARCHAR(255),
-    created_at TIMESTAMP DEFAULT NOW()
+    name_ar VARCHAR(200) NOT NULL,
+    name_en VARCHAR(200) NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    impact_description VARCHAR(200),
+    impact_percentage DOUBLE PRECISION,
+    affected_products JSONB,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_holiday_calendar_event_type ON holiday_calendar(event_type);
+CREATE INDEX IF NOT EXISTS idx_holiday_calendar_start_date ON holiday_calendar(start_date);
 
 CREATE TABLE IF NOT EXISTS predictions (
     id SERIAL PRIMARY KEY,
