@@ -20,28 +20,32 @@ async def seed_database(db: AsyncSession = Depends(get_db), _=Depends(require_ad
 
     try:
         await seed_default_sources(db)
+    except Exception as e:
+        logger.exception("Seed failed for sources")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Sources seed failed: {e}")
+
+    try:
         r = await db.execute(select(func.count(ScrapingSource.id)))
         results["sources_count"] = r.scalar() or 0
-        logger.info(f"Seed: {results['sources_count']} sources")
-    except Exception:
-        logger.exception("Seed failed for sources")
-        raise
+    except Exception as e:
+        logger.exception("Source count query failed")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Source count failed: {e}")
 
     try:
         results["holidays_count"] = await seed_holidays(db)
-        logger.info(f"Seed: {results['holidays_count']} holidays")
-    except Exception:
+    except Exception as e:
         logger.exception("Seed failed for holidays")
-        raise
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Holiday seed failed: {e}")
 
     try:
         results["sample_prices_count"] = await seed_sample_prices(db)
-        logger.info(f"Seed: {results['sample_prices_count']} sample prices")
-    except Exception:
+    except Exception as e:
         logger.exception("Seed failed for sample prices")
-        raise
-
-    await db.commit()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Sample prices seed failed: {e}")
 
     return {
         **results,
