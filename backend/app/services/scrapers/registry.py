@@ -36,22 +36,23 @@ def get_scraper(source: ScrapingSource, db: AsyncSession) -> Optional[BaseScrape
 
 async def seed_default_sources(db: AsyncSession):
     for src_data in DEFAULT_SOURCES:
-        is_active = src_data.get("is_active", True)
-        stmt = select(ScrapingSource).where(ScrapingSource.url == src_data["url"])
+        data = dict(src_data)
+        active = data.pop("is_active", True)
+        stmt = select(ScrapingSource).where(ScrapingSource.url == data["url"])
         existing = (await db.execute(stmt)).scalar_one_or_none()
 
         if existing is None:
-            source = ScrapingSource(**src_data, is_active=is_active)
+            source = ScrapingSource(**data, is_active=active)
             db.add(source)
             logger.info(
-                f"Seeded scraping source: {src_data['name']} "
-                f"(active={is_active})"
+                f"Seeded scraping source: {data['name']} "
+                f"(active={active})"
             )
         else:
-            if existing.is_active != is_active:
-                existing.is_active = is_active
+            if existing.is_active != active:
+                existing.is_active = active
                 logger.info(
-                    f"Updated source '{src_data['name']}' active={is_active}"
+                    f"Updated source '{data['name']}' active={active}"
                 )
 
     await db.commit()
