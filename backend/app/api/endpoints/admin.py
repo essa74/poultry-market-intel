@@ -2,9 +2,10 @@ import logging
 import traceback
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, or_
 from app.db.session import get_db, async_session
 from app.api.deps import require_admin_token
+from app.core.config import get_settings
 from app.services.scrapers import seed_default_sources
 from app.services.scrapers.registry import seed_sample_prices
 from app.services.holiday_calendar_service import seed_holidays
@@ -26,8 +27,13 @@ async def seed_database(db: AsyncSession = Depends(get_db), _=Depends(require_ad
         print(f"Running seed_holidays... (sources={sources_count})")
         holidays_count = await seed_holidays(db)
 
-        print("Running seed_sample_prices...")
-        sample_prices_count = await seed_sample_prices(db)
+        settings = get_settings()
+        if settings.env == "production":
+            print("Production mode — skipping sample prices")
+            sample_prices_count = 0
+        else:
+            print("Running seed_sample_prices...")
+            sample_prices_count = await seed_sample_prices(db)
 
         print(f"Seed done: sources={sources_count} holidays={holidays_count} prices={sample_prices_count}")
         return {
@@ -63,6 +69,28 @@ async def fix_egg_units(db: AsyncSession = Depends(get_db), _=Depends(require_ad
         r = await db.execute(stmt)
         await db.commit()
         return {"success": True, "updated_records": r.rowcount, "message": "Units fixed"}
+    except Exception as e:
+        traceback.print_exc()
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+
+@router.post("/delete-sample-prices")
+async def delete_sample_prices(db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
+    from app.models import PriceRecord
+
+    try:
+        stmt = select(PriceRecord).where(
+            or_(
+                PriceRecord.source == "manual",
+                PriceRecord.raw_post_text.contains("سعر تجريبي"),
+            )
+        )
+        r = await db.execute(stmt)
+        records = r.scalars().all()
+        for rec in records:
+            await db.delete(rec)
+        await db.commit()
+        return {"success": True, "deleted_count": len(records), "message": "Sample prices deleted"}
     except Exception as e:
         traceback.print_exc()
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}

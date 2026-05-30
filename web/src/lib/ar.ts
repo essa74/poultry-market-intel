@@ -21,6 +21,7 @@ export const ar = {
     retry: "إعادة المحاولة",
     noData: "لا توجد بيانات",
     noMarketData: "لا توجد بيانات سوق كافية بعد",
+    noRealData: "لا توجد بيانات حقيقية متاحة حالياً",
     awaitingFirstCollection: "بانتظار أول دورة جمع بيانات",
     save: "حفظ",
     cancel: "إلغاء",

@@ -53,6 +53,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_production(self) -> "Settings":
+        env_var = os.getenv("ENVIRONMENT", "")
+        if env_var == "production":
+            self.env = "production"
         if self.env == "production" and not self.admin_token:
             raise ValueError(
                 "ADMIN_TOKEN is required when ENV=production. "

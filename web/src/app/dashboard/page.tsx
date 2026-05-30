@@ -109,7 +109,7 @@ export default function DashboardPage() {
         <GlassCard>
           <div className="text-center py-12">
             <Egg className="w-10 h-10 mx-auto text-gray-600 mb-3" />
-            <p className="text-sm text-gray-500">{ar.common.noMarketData}</p>
+            <p className="text-sm text-gray-500">{ar.common.noRealData}</p>
             <p className="text-xs text-gray-600 mt-1">{ar.common.awaitingFirstCollection}</p>
           </div>
         </GlassCard>
@@ -153,7 +153,7 @@ export default function DashboardPage() {
             ) : (
               <GlassCard glow="none" hover={false}>
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500">{ar.common.noMarketData}</p>
+                  <p className="text-sm text-gray-500">{ar.common.noRealData}</p>
                   <p className="text-xs text-gray-600 mt-1">{ar.common.awaitingFirstCollection}</p>
                 </div>
               </GlassCard>
@@ -182,7 +182,7 @@ export default function DashboardPage() {
                 <PriceChart data={weeklyTrend} />
               ) : (
                 <div className="h-[300px] flex flex-col items-center justify-center text-gray-500 text-sm">
-                  <span className="mb-1">{ar.common.noMarketData}</span>
+                  <span className="mb-1">{ar.common.noRealData}</span>
                   <span className="text-xs text-gray-600">{ar.common.awaitingFirstCollection}</span>
                 </div>
               )}
@@ -216,43 +216,10 @@ export default function DashboardPage() {
               </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500">{ar.common.noMarketData}</p>
+                  <p className="text-sm text-gray-500">{ar.common.noRealData}</p>
                   <p className="text-xs text-gray-600 mt-1">{ar.common.awaitingFirstCollection}</p>
                 </div>
               )}
-            </GlassCard>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <GlassCard className="lg:col-span-2" glow="emerald">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <BrainCircuit className="w-5 h-5 text-emerald-400" />
-                  <h2 className="text-lg font-semibold text-white">{ar.dashboard.aiPoweredInsights}</h2>
-                </div>
-                <span className="badge-green text-[10px]">AI</span>
-              </div>
-              <div className="text-xs text-gray-500 text-center py-8">
-                <p className="mb-2">تحليلات متقدمة ونماذج تنبؤية</p>
-                <p>راجع صفحة رؤى الذكاء الاصطناعي للتفاصيل</p>
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <BrainCircuit className="w-4 h-4 text-emerald-400" />
-                  <a href="/ai-insights" className="text-emerald-400 hover:text-emerald-300 font-medium text-xs">
-                    اذهب إلى رؤى الذكاء الاصطناعي
-                  </a>
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard glow="gold">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">
-                  {ar.dashboard.latestPrices}
-                </h2>
-                <button onClick={() => { refetchEgg(); refetchChick(); }} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
               {(latestAll || []).length > 0 ? (
               <div className="space-y-3">
                 {(latestAll || []).slice(0, 8).map((record, i) => (
@@ -284,7 +251,7 @@ export default function DashboardPage() {
               </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500">{ar.common.noMarketData}</p>
+                  <p className="text-sm text-gray-500">{ar.common.noRealData}</p>
                   <p className="text-xs text-gray-600 mt-1">{ar.common.awaitingFirstCollection}</p>
                 </div>
               )}
