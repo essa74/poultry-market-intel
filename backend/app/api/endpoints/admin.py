@@ -96,6 +96,37 @@ async def delete_sample_prices(db: AsyncSession = Depends(get_db), _=Depends(req
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 
+@router.post("/delete-all-prices")
+async def delete_all_prices(_=Depends(require_admin_token)):
+    from app.models import PriceRecord
+    from app.models.scraping import RawExtractedPrice
+
+    try:
+        async with async_session() as db:
+            async with db.begin():
+                rp = await db.execute(delete(RawExtractedPrice))
+                deleted_raw = rp.rowcount or 0
+
+                pp = await db.execute(delete(PriceRecord))
+                deleted_prices = pp.rowcount or 0
+
+        logger.info(f"delete-all-prices: {deleted_prices} price_records, {deleted_raw} raw_extracted_prices deleted")
+        return {
+            "success": True,
+            "deleted_price_records": deleted_prices,
+            "deleted_raw_records": deleted_raw,
+            "message": "All prices deleted",
+        }
+    except Exception as e:
+        logger.error(f"delete-all-prices failed: {e}")
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
+
+
 @router.post("/reset-prices")
 async def reset_prices(_=Depends(require_admin_token)):
     from app.models import PriceRecord
