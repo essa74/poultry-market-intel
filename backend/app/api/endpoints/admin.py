@@ -2,8 +2,8 @@ import logging
 import traceback
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.db.session import get_db
+from sqlalchemy import select, func, delete
+from app.db.session import get_db, async_session
 from app.api.deps import require_admin_token
 from app.services.scrapers import seed_default_sources
 from app.services.scrapers.registry import seed_sample_prices
@@ -66,7 +66,28 @@ async def fix_egg_units(db: AsyncSession = Depends(get_db), _=Depends(require_ad
     except Exception as e:
         traceback.print_exc()
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
-        print(f"SEED ERROR: {e}")
+
+
+@router.post("/reset-prices")
+async def reset_prices(_=Depends(require_admin_token)):
+    from app.models import PriceRecord
+    from app.models.scraping import RawExtractedPrice
+
+    try:
+        async with async_session() as db:
+            async with db.begin():
+                rp = await db.execute(delete(RawExtractedPrice))
+                deleted_raw = rp.rowcount or 0
+
+                pp = await db.execute(delete(PriceRecord))
+                deleted_prices = pp.rowcount or 0
+
+        return {
+            "success": True,
+            "deleted_prices": deleted_prices,
+            "deleted_raw": deleted_raw,
+        }
+    except Exception as e:
         traceback.print_exc()
         return {
             "success": False,
