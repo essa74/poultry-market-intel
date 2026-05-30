@@ -32,6 +32,15 @@ const UNIT_LABELS: Record<string, string> = {
   per_carton: "للكرتونة",
 };
 
+function unitLabel(record: { product_type: string; unit: string }): string {
+  if (record.unit === "per_unit") {
+    if (record.product_type === "fertilized_eggs") return "للبيضة";
+    if (record.product_type === "day_old_chicks") return "للكتكوت";
+    return "للواحدة";
+  }
+  return UNIT_LABELS[record.unit] || record.unit;
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   white: "أبيض",
   sasso: "ساسو",
@@ -266,7 +275,7 @@ export default function DailyPricesPage() {
                       <span className="font-semibold text-white">{record.price.toFixed(1)}</span>
                       <span className="text-xs text-gray-500 mr-1">ج.م</span>
                     </td>
-                    <td className="py-3 px-3 text-gray-400">{UNIT_LABELS[record.unit] || record.unit}</td>
+                    <td className="py-3 px-3 text-gray-400">{unitLabel(record)}</td>
                     <td className="py-3 px-3 text-gray-400">{record.source || "-"}</td>
                     <td className="py-3 px-3 text-xs text-gray-500">{record.recorded_date}</td>
                   </motion.tr>

@@ -122,11 +122,13 @@ async def save_extracted_price(
         if "كراتين" in raw_text or "كرتونة" in raw_text:
             unit = "per_carton"
         elif pg == "fertilized_eggs":
-            unit = "per_tray"
+            unit = "per_unit"
         elif pg in ("chicks", "ducks"):
             unit = "per_unit"
         else:
             unit = "per_unit"
+    elif product_type == "fertilized_eggs" and unit == "per_tray":
+        unit = "per_unit"
 
     record = PriceRecord(
         product_type=product_type,

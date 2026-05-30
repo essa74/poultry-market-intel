@@ -31,7 +31,7 @@ class ManualPriceEntry(BaseModel):
     product_type: str = Field(..., pattern=r"^(fertilized_eggs|day_old_chicks|feed)$")
     category: str = Field(..., pattern=r"^(white|sasso|baladi|other|feed_corn|feed_soy)$")
     price: float = Field(..., gt=0)
-    unit: str = Field(..., pattern=r"^(per_tray|per_egg|per_unit|per_ton)$")
+    unit: str = Field(..., pattern=r"^(per_tray|per_egg|per_unit|per_ton|per_carton)$")
     source_name: str = Field(default="إدخال يدوي")
     raw_note: Optional[str] = None
     recorded_date: Optional[date] = None
@@ -41,12 +41,15 @@ class ManualPriceEntry(BaseModel):
 async def create_manual_price(entry: ManualPriceEntry, db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
     record_date = entry.recorded_date or date.today()
     product_group = PRODUCT_GROUP_MAP.get(entry.product_type)
+    unit = entry.unit
+    if entry.product_type == "fertilized_eggs" and unit == "per_tray":
+        unit = "per_unit"
     record = PriceRecord(
         product_type=entry.product_type,
         category=entry.category,
         price=entry.price,
         currency="EGP",
-        unit=entry.unit,
+        unit=unit,
         market="manual",
         source=entry.source_name or "إدخال يدوي",
         raw_product_name=entry.raw_note,

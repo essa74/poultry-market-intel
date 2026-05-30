@@ -132,14 +132,14 @@ async def seed_sample_prices(db: AsyncSession) -> int:
     logger.info("seed_sample_prices: generating 3 days of sample data...")
 
     FEATURED_CATEGORIES = [
-        ("white", "أبيض", 58.0),
-        ("sasso", "ساسو", 68.0),
-        ("baladi", "بلدي", 75.0),
-        ("local", "محلي / فيومي وجميزة", 62.0),
-        ("duck", "بط", 85.0),
-        ("quail", "سمان", 50.0),
-        ("turkey", "رومي", 120.0),
-        ("ostrich", "نعام", 500.0),
+        ("white", "أبيض", 4.2),
+        ("sasso", "ساسو", 4.8),
+        ("baladi", "بلدي", 5.5),
+        ("local", "محلي / فيومي وجميزة", 4.5),
+        ("duck", "بط", 6.0),
+        ("quail", "سمان", 3.5),
+        ("turkey", "رومي", 8.0),
+        ("ostrich", "نعام", 35.0),
     ]
     today = date.today()
     count = 0
@@ -152,7 +152,7 @@ async def seed_sample_prices(db: AsyncSession) -> int:
                 category=cat_key,
                 price=round(base_price + variation, 1),
                 currency="EGP",
-                unit="per_tray",
+                unit="per_unit",
                 source="بورصة المهدي جروب",
                 recorded_date=d,
                 raw_product_name=f"بيض مخصب {cat_label}",

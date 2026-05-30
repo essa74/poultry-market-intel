@@ -239,14 +239,14 @@ def test_manual_price_model():
         product_type="fertilized_eggs",
         category="white",
         price=95.0,
-        unit="per_tray",
+        unit="per_unit",
         source_name="مصدر اختباري",
         raw_note="سعر اختباري",
     )
     assert entry.product_type == "fertilized_eggs"
     assert entry.category == "white"
     assert entry.price == 95.0
-    assert entry.unit == "per_tray"
+    assert entry.unit == "per_unit"
     assert entry.source_name == "مصدر اختباري"
     assert entry.raw_note == "سعر اختباري"
     assert entry.recorded_date is None  # defaults to None, backend will use today

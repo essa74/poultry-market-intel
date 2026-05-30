@@ -46,3 +46,30 @@ async def seed_database(db: AsyncSession = Depends(get_db), _=Depends(require_ad
             "error": str(e),
             "traceback": traceback.format_exc(),
         }
+
+
+@router.post("/fix-units")
+async def fix_egg_units(db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
+    from app.models import PriceRecord
+    from sqlalchemy import update
+
+    try:
+        stmt = (
+            update(PriceRecord)
+            .where(PriceRecord.product_type == "fertilized_eggs")
+            .where(PriceRecord.unit == "per_tray")
+            .values(unit="per_unit")
+        )
+        r = await db.execute(stmt)
+        await db.commit()
+        return {"success": True, "updated_records": r.rowcount, "message": "Units fixed"}
+    except Exception as e:
+        traceback.print_exc()
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+        print(f"SEED ERROR: {e}")
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
