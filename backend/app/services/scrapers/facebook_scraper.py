@@ -149,6 +149,12 @@ LOGIN_INDICATORS = [
     "you must log in", "سجل الدخول",
 ]
 
+ERROR_PAGE_INDICATORS = [
+    "<title>خطأ", "خطأ", "صفحة غير متاحة",
+    "page isn't available", "page not found",
+    "content isn't available right now",
+]
+
 # ── Image URL filter patterns ──────────────────────────────────────────────
 REJECT_IMAGE_PATTERNS = re.compile(
     r"(z-m-static|static\.xx\.fbcdn|rsrc\.php|hsts-pixel|emoji)", re.I
@@ -499,6 +505,16 @@ def _extract_page_id(url: str) -> str:
         path = path[1:]
     path = path.split("/")[0].split("?")[0]
     return path
+
+
+def _is_error_page(title: str, body_text: str) -> bool:
+    """Check if a Facebook page returned an error/blocked page instead of content."""
+    lower_title = title.lower()
+    lower_body = body_text.lower()
+    for ind in ERROR_PAGE_INDICATORS:
+        if ind in lower_body or ind in lower_title:
+            return True
+    return False
 
 
 def _build_attempt_urls(page_id: str) -> list[str]:
@@ -1138,8 +1154,26 @@ class FacebookPageScraper(BaseScraper):
                             logger.warning(f"body wait timeout on {url}, proceeding anyway")
                         await page.wait_for_timeout(2000)
 
+                        final_url = page.url
+                        page_title = await page.title()
                         page_text = await page.inner_text("body")
                         page_text_lower = page_text.lower()
+
+                        self.debug_info["final_url"] = final_url
+                        self.debug_info["page_title"] = page_title
+                        self.debug_info["body_text_preview"] = page_text[:500]
+
+                        logger.warning(
+                            f"PLAYWRIGHT: url={url} final_url={final_url} "
+                            f"title={page_title} body_len={len(page_text)}"
+                        )
+
+                        if _is_error_page(page_title, page_text):
+                            self.debug_info["facebook_blocked"] = True
+                            self.debug_info["facebook_block_reason"] = f"error_page_on_{url}"
+                            logger.warning(f"Facebook {page_id}: error page on {url} via playwright (title={page_title})")
+                            continue
+
                         if any(ind in page_text_lower for ind in LOGIN_INDICATORS):
                             self.debug_info["facebook_blocked"] = True
                             self.debug_info["facebook_block_reason"] = f"login_wall_on_{url}"
@@ -1269,6 +1303,7 @@ class FacebookPageScraper(BaseScraper):
                 "Chrome/125.0.0.0 Mobile Safari/537.36"
             ),
         )
+        all_post_entries: list[dict] = []
         try:
             for url in urls:
                 if structured_items:
@@ -1281,8 +1316,27 @@ class FacebookPageScraper(BaseScraper):
                         pass
                     await page.wait_for_timeout(3000)
 
+                    final_url = page.url
+                    page_title = await page.title()
                     body_text = await page.inner_text("body")
-                    if any(ind in body_text.lower() for ind in LOGIN_INDICATORS):
+                    body_text_lower = body_text.lower()
+
+                    self.debug_info["final_url"] = final_url
+                    self.debug_info["page_title"] = page_title
+                    self.debug_info["body_text_preview"] = body_text[:500]
+
+                    logger.warning(
+                        f"AUTO-DISCOVER: url={url} final_url={final_url} "
+                        f"title={page_title} body_len={len(body_text)}"
+                    )
+
+                    if _is_error_page(page_title, body_text):
+                        self.debug_info["facebook_blocked"] = True
+                        self.debug_info["facebook_block_reason"] = f"error_page_on_{url}"
+                        logger.warning(f"Auto-discover: error page on {url} (title={page_title})")
+                        continue
+
+                    if any(ind in body_text_lower for ind in LOGIN_INDICATORS):
                         self.debug_info["facebook_blocked"] = True
                         self.debug_info["facebook_block_reason"] = f"login_wall_on_{url}"
                         logger.warning(f"Auto-discover: login wall on {url}")
@@ -1330,6 +1384,7 @@ class FacebookPageScraper(BaseScraper):
                         }
                     """)
                     post_entries = post_entries or []
+                    all_post_entries = post_entries
 
                     logger.info(
                         f"Auto-discover: found {len(post_entries)} post elements on {url}"
@@ -1404,7 +1459,7 @@ class FacebookPageScraper(BaseScraper):
                 pass
 
         self.debug_info["auto_discover_post_debug"] = post_debug_list
-        self.debug_info["discovered_posts_count"] = len(post_entries) if 'post_entries' in dir() else 0
+        self.debug_info["discovered_posts_count"] = len(all_post_entries)
         self.debug_info["discovered_price_posts_count"] = price_post_count
         self.debug_info["parsed_price_lines_count"] = len(structured_items)
 
