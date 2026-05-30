@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from app.db.session import get_db
 from app.api.deps import require_admin_token
 from app.services.scrapers import seed_default_sources
+from app.services.scrapers.registry import seed_sample_prices
 from app.services.holiday_calendar_service import seed_holidays
 from app.models.scraping import ScrapingSource
 
@@ -34,11 +35,8 @@ async def seed_database(db: AsyncSession = Depends(get_db), _=Depends(require_ad
         raise
 
     try:
-        from scripts.seed_data import seed_sample_prices
         results["sample_prices_count"] = await seed_sample_prices(db)
         logger.info(f"Seed: {results['sample_prices_count']} sample prices")
-    except ImportError:
-        logger.info("seed_sample_prices not available — skipping")
     except Exception:
         logger.exception("Seed failed for sample prices")
         raise

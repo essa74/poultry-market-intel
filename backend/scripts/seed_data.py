@@ -37,74 +37,8 @@ async def seed(db):
 
 
 async def seed_sample_prices(db):
-    from app.models import PriceRecord
-    from sqlalchemy import select, func
-
-    result = await db.execute(select(func.count(PriceRecord.id)))
-    total = result.scalar() or 0
-    if total > 0:
-        logger.info(f"Price records table already has {total} rows — skipping sample data.")
-        return
-
-    logger.info("No price records found — generating sample data for 3 days...")
-
-    FEATURED_CATEGORIES = [
-        ("white", "أبيض", 58.0),
-        ("sasso", "ساسو", 68.0),
-        ("baladi", "بلدي", 75.0),
-        ("local", "محلي / فيومي وجميزة", 62.0),
-        ("duck", "بط", 85.0),
-        ("quail", "سمان", 50.0),
-        ("turkey", "رومي", 120.0),
-        ("ostrich", "نعام", 500.0),
-    ]
-
-    today = date.today()
-    count = 0
-    for day_offset in range(3):
-        d = today - timedelta(days=day_offset)
-        for cat_key, cat_label, base_price in FEATURED_CATEGORIES:
-            price_variation = (day_offset * 1.5) + (hash(cat_key + str(d)) % 10 - 5) * 0.5
-            record = PriceRecord(
-                product_type="fertilized_eggs",
-                category=cat_key,
-                price=round(base_price + price_variation, 1),
-                currency="EGP",
-                unit="per_tray",
-                source="بورصة المهدي جروب",
-                recorded_date=d,
-                raw_product_name=f"بيض مخصب {cat_label}",
-                product_group="fertilized_eggs",
-            )
-            db.add(record)
-            count += 1
-
-    # Add a few chick records
-    chick_data = [
-        ("white", "أبيض", 18.0),
-        ("sasso", "ساسو", 15.5),
-        ("baladi", "بلدي", 12.0),
-    ]
-    for day_offset in range(3):
-        d = today - timedelta(days=day_offset)
-        for cat_key, cat_label, base_price in chick_data:
-            variation = (day_offset * 0.3) + (hash(f"chick_{cat_key}{d}") % 10 - 5) * 0.2
-            record = PriceRecord(
-                product_type="day_old_chicks",
-                category=cat_key,
-                price=round(base_price + variation, 1),
-                currency="EGP",
-                unit="per_unit",
-                source="بورصة المهدي جروب",
-                recorded_date=d,
-                raw_product_name=f"كتاكيت {cat_label}",
-                product_group="chicks",
-            )
-            db.add(record)
-            count += 1
-
-    await db.commit()
-    logger.info(f"Generated {count} sample price records.")
+    from app.services.scrapers.registry import seed_sample_prices as _seed
+    return await _seed(db)
 
 
 async def main():
