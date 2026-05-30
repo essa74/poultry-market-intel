@@ -1,4 +1,5 @@
 import logging
+import traceback
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -16,38 +17,32 @@ router = APIRouter()
 
 @router.post("/seed")
 async def seed_database(db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
-    results = {"sources_count": 0, "holidays_count": 0, "sample_prices_count": 0}
-
     try:
+        print("Running seed_default_sources...")
         await seed_default_sources(db)
-    except Exception as e:
-        logger.exception("Seed failed for sources")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"Sources seed failed: {e}")
 
-    try:
         r = await db.execute(select(func.count(ScrapingSource.id)))
-        results["sources_count"] = r.scalar() or 0
-    except Exception as e:
-        logger.exception("Source count query failed")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"Source count failed: {e}")
+        sources_count = r.scalar() or 0
+        print(f"Running seed_holidays... (sources={sources_count})")
+        holidays_count = await seed_holidays(db)
 
-    try:
-        results["holidays_count"] = await seed_holidays(db)
-    except Exception as e:
-        logger.exception("Seed failed for holidays")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"Holiday seed failed: {e}")
+        print("Running seed_sample_prices...")
+        sample_prices_count = await seed_sample_prices(db)
 
-    try:
-        results["sample_prices_count"] = await seed_sample_prices(db)
-    except Exception as e:
-        logger.exception("Seed failed for sample prices")
-        from fastapi import HTTPException
-        raise HTTPException(status_code=500, detail=f"Sample prices seed failed: {e}")
+        print(f"Seed done: sources={sources_count} holidays={holidays_count} prices={sample_prices_count}")
+        return {
+            "success": True,
+            "sources_count": sources_count,
+            "holidays_count": holidays_count,
+            "sample_prices_count": sample_prices_count,
+            "message": "Seed completed",
+        }
 
-    return {
-        **results,
-        "message": "Seed completed",
-    }
+    except Exception as e:
+        print(f"SEED ERROR: {e}")
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
