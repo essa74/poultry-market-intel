@@ -1,6 +1,6 @@
 import logging
 import traceback
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete, or_
 from pydantic import BaseModel, Field
@@ -77,85 +77,106 @@ async def fix_egg_units(db: AsyncSession = Depends(get_db), _=Depends(require_ad
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 
-@router.post("/delete-sample-prices")
-async def delete_sample_prices(db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
+@router.post("/prices/ocr-preview")
+async def ocr_preview(
+    image: UploadFile = File(...),
+    recorded_date: Optional[str] = Form(None),
+    _=Depends(require_admin_token),
+):
+    from app.services.ocr_service import ocr_image
+    from app.services.scrapers.facebook_scraper import _parse_arabic_price_lines
+
+    if not image.content_type or not image.content_type.startswith("image/"):
+        return {"success": False, "error": "يجب رفع ملف صورة (jpg/png/webp)"}
+
+    try:
+        image_bytes = await image.read()
+    except Exception as e:
+        return {"success": False, "error": f"فشل قراءة الصورة: {e}"}
+
+    success, extracted_text, error = await ocr_image(image_bytes)
+    if not success:
+        return {"success": False, "error": error}
+
+    parsed_items, rejected_lines = _parse_arabic_price_lines(extracted_text)
+
+    items = []
+    for pl in parsed_items:
+        unit = pl.get("unit", "per_unit")
+        if pl["product_type"] == "fertilized_eggs" and unit == "per_tray":
+            unit = "per_unit"
+        items.append({
+            "product_type": pl["product_type"],
+            "category": pl["category"],
+            "raw_product_name": pl["raw_line"],
+            "price": pl["price"],
+            "unit": unit,
+        })
+
+    return {
+        "success": True,
+        "extracted_text": extracted_text,
+        "parsed_items": items,
+        "rejected_lines": rejected_lines[:20],
+    }
+
+
+class OcrSaveItem(BaseModel):
+    product_type: str
+    category: str
+    raw_product_name: str = ""
+    price: float
+    unit: str = "per_unit"
+
+
+class OcrSaveBody(BaseModel):
+    items: list[OcrSaveItem]
+    recorded_date: Optional[date] = None
+
+
+@router.post("/prices/ocr-save")
+async def ocr_save(
+    body: OcrSaveBody,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin_token),
+):
     from app.models import PriceRecord
 
     try:
-        stmt = select(PriceRecord).where(
-            or_(
-                PriceRecord.source == "manual",
-                PriceRecord.raw_post_text.contains("سعر تجريبي"),
+        record_date = body.recorded_date or date.today()
+        saved = 0
+        for item in body.items:
+            unit = item.unit
+            if item.product_type == "fertilized_eggs" and unit == "per_tray":
+                unit = "per_unit"
+            product_group = "fertilized_eggs" if item.product_type == "fertilized_eggs" else "chicks"
+            record = PriceRecord(
+                product_type=item.product_type,
+                category=item.category,
+                price=item.price,
+                currency="EGP",
+                unit=unit,
+                market="ocr_market",
+                source="ocr_market",
+                raw_product_name=item.raw_product_name or None,
+                raw_post_text="تم الاستخراج من صورة",
+                product_group=product_group,
+                recorded_date=record_date,
             )
-        )
-        r = await db.execute(stmt)
-        records = r.scalars().all()
-        for rec in records:
-            await db.delete(rec)
+            db.add(record)
+            saved += 1
+
         await db.commit()
-        return {"success": True, "deleted_count": len(records), "message": "Sample prices deleted"}
+
+        return {
+            "success": True,
+            "saved_count": saved,
+            "message": f"تم حفظ {saved} سعر بنجاح",
+        }
+
     except Exception as e:
         traceback.print_exc()
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
-
-
-@router.post("/delete-all-prices")
-async def delete_all_prices(_=Depends(require_admin_token)):
-    from app.models import PriceRecord
-    from app.models.scraping import RawExtractedPrice
-
-    try:
-        async with async_session() as db:
-            async with db.begin():
-                rp = await db.execute(delete(RawExtractedPrice))
-                deleted_raw = rp.rowcount or 0
-
-                pp = await db.execute(delete(PriceRecord))
-                deleted_prices = pp.rowcount or 0
-
-        logger.info(f"delete-all-prices: {deleted_prices} price_records, {deleted_raw} raw_extracted_prices deleted")
-        return {
-            "success": True,
-            "deleted_price_records": deleted_prices,
-            "deleted_raw_records": deleted_raw,
-            "message": "All prices deleted",
-        }
-    except Exception as e:
-        logger.error(f"delete-all-prices failed: {e}")
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-        }
-
-
-@router.post("/reset-prices")
-async def reset_prices(_=Depends(require_admin_token)):
-    from app.models import PriceRecord
-    from app.models.scraping import RawExtractedPrice
-
-    try:
-        async with async_session() as db:
-            async with db.begin():
-                rp = await db.execute(delete(RawExtractedPrice))
-                deleted_raw = rp.rowcount or 0
-
-                pp = await db.execute(delete(PriceRecord))
-                deleted_prices = pp.rowcount or 0
-
-        return {
-            "success": True,
-            "deleted_prices": deleted_prices,
-            "deleted_raw": deleted_raw,
-        }
-    except Exception as e:
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-        }
 
 
 class ManualPriceEntry(BaseModel):
