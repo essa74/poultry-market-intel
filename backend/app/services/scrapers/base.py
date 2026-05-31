@@ -30,6 +30,7 @@ class BaseScraper(abc.ABC):
         self.log: Optional[ScrapingLog] = None
         self.raw_content: str = ""
         self.debug_info: dict = {}
+        logger.info("BaseScraper init: source=%s config=%s", source.id, source.config)
 
     @abc.abstractmethod
     async def fetch_raw_data(self) -> list:

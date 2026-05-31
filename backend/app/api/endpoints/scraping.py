@@ -2,6 +2,7 @@ import logging
 import time
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 logger = logging.getLogger(__name__)
 from sqlalchemy import select, func, delete
@@ -131,10 +132,20 @@ async def update_source_config(source_id: int, body: CreateSourceRequest, db: As
     source.name = body.name
     source.url = body.url
     source.source_type = body.source_type
-    source.config = body.config
+
+    logger.info("update_source_config: source=%s before config=%s", source_id, source.config)
+
+    # Merge new config into existing config — never reset post_urls
+    merged = dict(source.config or {})
+    merged.update(body.config)
+    source.config = merged
+    flag_modified(source, "config")
+
     source.is_active = body.is_active
     await db.commit()
     await db.refresh(source)
+
+    logger.info("update_source_config: source=%s after refresh config=%s", source_id, source.config)
     return ScrapingSourceResponse.model_validate(source)
 
 
@@ -162,7 +173,11 @@ async def update_source_post_urls(source_id: int, body: UpdatePostUrlsRequest, d
             "en": "Source not found",
             "ar": "المصدر غير موجود",
         })
-    config = source.config or {}
+
+    logger.info("update_source_post_urls: source=%s before config=%s", source_id, source.config)
+
+    # Force a NEW dict to ensure SQLAlchemy detects the change
+    config = dict(source.config or {})
     config["post_urls"] = body.post_urls
     if body.auto_discover is not None:
         config["auto_discover"] = body.auto_discover
@@ -171,9 +186,15 @@ async def update_source_post_urls(source_id: int, body: UpdatePostUrlsRequest, d
     if body.max_price_posts is not None:
         config["max_price_posts"] = body.max_price_posts
     source.config = config
+    flag_modified(source, "config")
+
+    logger.info("update_source_post_urls: source=%s after assign config=%s", source_id, source.config)
+
     await db.commit()
     await db.refresh(source)
-    return {"message": "تم تحديث إعدادات المصدر", "config": config}
+
+    logger.info("update_source_post_urls: source=%s after refresh config=%s", source_id, source.config)
+    return {"message": "تم تحديث إعدادات المصدر", "config": source.config}
 
 
 class DeleteSourceResponse(BaseModel):
