@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import toast from "react-hot-toast";
-import { Save, FileText, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Save, FileText, Loader2, CheckCircle2, XCircle, LayoutDashboard } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import GlassCard from "@/components/GlassCard";
 
@@ -90,6 +91,7 @@ export default function AdminPricesPage() {
         setPrice("");
         setRawName("");
         setNotes("");
+        setShowDashboardLink(true);
         queryClient.invalidateQueries({ queryKey: ["prices"] });
       } else {
         toast.error(data.error || "فشل الحفظ");
@@ -97,6 +99,8 @@ export default function AdminPricesPage() {
     },
     onError: () => toast.error("فشل الاتصال بالخادم"),
   });
+
+  const [showDashboardLink, setShowDashboardLink] = useState(false);
 
   const bulkMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -110,6 +114,7 @@ export default function AdminPricesPage() {
         toast.success(data.message);
         setResult({ saved: data.saved_count, failed: data.failed_count, failedLines: data.failed_lines });
         setBulkText("");
+        setShowDashboardLink(true);
         queryClient.invalidateQueries({ queryKey: ["prices"] });
       } else {
         toast.error(data.error || "فشل الحفظ");
@@ -149,8 +154,8 @@ export default function AdminPricesPage() {
   return (
     <div dir="rtl">
       <PageHeader
-        title="إدخال الأسعار يدوياً"
-        subtitle="إضافة أسعار السوق الحقيقية بشكل يدوي — مفرد أو بالجملة"
+        title="إدخال أسعار السوق"
+        subtitle="أدخل أسعار البيض المخصب والكتاكيت بسرعة لتحديث لوحة التحكم فوراً"
         badge="يدوي"
       />
 
@@ -344,6 +349,18 @@ export default function AdminPricesPage() {
           </form>
         )}
       </GlassCard>
+
+      {showDashboardLink && (
+        <div className="mt-6 flex justify-center">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-medium hover:bg-emerald-500/30 transition-colors"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            عرض لوحة التحكم
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

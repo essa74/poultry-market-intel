@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Activity, RefreshCw, Play, AlertTriangle, CheckCircle2,
   XCircle, Clock, Database, Globe, MessageCircle, ExternalLink, Plus, Trash2, RotateCcw, Key,
@@ -298,6 +299,18 @@ export default function AdminScrapingPage() {
         subtitle="لوحة تحكم نظام جمع الأسعار الآلي — حالة المصادر، السجلات، والبيانات المستخرجة"
         badge="Admin"
       />
+
+      <div className="mb-4 p-4 rounded-xl bg-gold-500/10 border border-gold-500/20">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-gold-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-gold-300 font-medium">جمع فيسبوك التلقائي غير مضمون على السيرفر المجاني</p>
+            <p className="text-xs text-gray-400 mt-1">
+              استخدم <Link href="/admin/prices" className="text-emerald-400 hover:underline">إدخال الأسعار اليدوي</Link> للتحديث اليومي — الطريقة المعتمدة حالياً لتحديث الأسعار.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {showTokenPrompt && (
         <GlassCard glow="gold" hover={false} className="mb-4">

@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Egg, Bird, BarChart3,
-  BrainCircuit, Eye, RefreshCw,
+  BrainCircuit, Eye, RefreshCw, PenLine,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
@@ -111,6 +112,13 @@ export default function DashboardPage() {
             <Egg className="w-10 h-10 mx-auto text-gray-600 mb-3" />
             <p className="text-sm text-gray-500">{ar.common.noRealData}</p>
             <p className="text-xs text-gray-600 mt-1">{ar.common.awaitingFirstCollection}</p>
+            <Link
+              href="/admin/prices"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm hover:bg-emerald-500/30 transition-colors"
+            >
+              <PenLine className="w-4 h-4" />
+              إدخال أسعار اليوم
+            </Link>
           </div>
         </GlassCard>
       </div>

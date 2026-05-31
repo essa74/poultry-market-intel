@@ -14,6 +14,8 @@ import {
   X,
   Shield,
   Home,
+  PenLine,
+  HardDrive,
 } from "lucide-react";
 import { useState } from "react";
 import { ar } from "@/lib/ar";
@@ -110,13 +112,27 @@ export default function Sidebar() {
 
           <div className="my-4 glow-line" />
 
+          <Link href="/admin/prices" onClick={() => setMobileOpen(false)}>
+            <motion.div
+              whileHover={{ x: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className={`sidebar-link group ${pathname === "/admin/prices" ? "active" : ""}`}
+            >
+              <PenLine className={`w-5 h-5 transition-colors ${pathname === "/admin/prices" ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"}`} />
+              <span className="flex-1">{ar.nav.pricesEntry}</span>
+              {pathname === "/admin/prices" && (
+                <motion.div layoutId="activeNav" className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              )}
+            </motion.div>
+          </Link>
+
           <Link href="/admin/scraping" onClick={() => setMobileOpen(false)}>
             <motion.div
               whileHover={{ x: -2 }}
               whileTap={{ scale: 0.98 }}
               className={`sidebar-link group ${pathname === "/admin/scraping" ? "active" : ""}`}
             >
-              <Shield className={`w-5 h-5 transition-colors ${pathname === "/admin/scraping" ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"}`} />
+              <HardDrive className={`w-5 h-5 transition-colors ${pathname === "/admin/scraping" ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"}`} />
               <span className="flex-1">إدارة المصادر</span>
               {pathname === "/admin/scraping" && (
                 <motion.div layoutId="activeNav" className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />

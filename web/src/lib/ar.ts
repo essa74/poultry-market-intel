@@ -14,6 +14,7 @@ export const ar = {
     seasonal: "التحليل الموسمي",
     aiInsights: "رؤى الذكاء الاصطناعي",
     scraping: "إدارة المصادر",
+    pricesEntry: "إدخال أسعار السوق",
   },
   common: {
     loading: "جاري التحميل...",
