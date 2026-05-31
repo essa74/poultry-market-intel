@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.db.session import async_session
 from app.models import NewsArticle
 
 logger = logging.getLogger(__name__)
@@ -483,19 +484,31 @@ async def cleanup_low_relevance(db: AsyncSession) -> int:
 
 
 async def refresh_all_news(db: AsyncSession) -> dict:
-    await cleanup_low_relevance(db)
+    deleted = 0
+    try:
+        async with async_session() as cleanup_db:
+            deleted = await cleanup_low_relevance(cleanup_db)
+    except Exception as e:
+        logger.warning(f"Cleanup session failed, trying passed-in session: {e}")
+        deleted = await cleanup_low_relevance(db)
     total_inserted = 0
     total_duplicates = 0
     for source in NEWS_SOURCES:
         ins, dup = await scrape_source(source, db)
         total_inserted += ins
         total_duplicates += dup
-    logger.info(f"News refresh complete: {total_inserted} new, {total_duplicates} duplicates total")
-    return {"inserted": total_inserted, "duplicates_skipped": total_duplicates}
+    logger.info(f"News refresh complete: {total_inserted} new, {total_duplicates} duplicates, {deleted} cleaned")
+    return {"inserted": total_inserted, "duplicates_skipped": total_duplicates, "deleted_low_relevance": deleted}
 
 
 async def refresh_all_news_debug(db: AsyncSession) -> tuple[int, list[dict]]:
-    cleaned = await cleanup_low_relevance(db)
+    cleaned = 0
+    try:
+        async with async_session() as cleanup_db:
+            cleaned = await cleanup_low_relevance(cleanup_db)
+    except Exception as e:
+        logger.warning(f"Debug cleanup session failed, trying passed-in session: {e}")
+        cleaned = await cleanup_low_relevance(db)
     total = 0
     debug_results = []
     for source in NEWS_SOURCES:

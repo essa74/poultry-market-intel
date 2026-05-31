@@ -13,10 +13,13 @@ def client():
     return AsyncClient(transport=transport, base_url="http://test")
 
 
+BASE_RESULT = {"inserted": 0, "duplicates_skipped": 0, "deleted_low_relevance": 0}
+
+
 @pytest.mark.asyncio
 async def test_news_refresh_returns_inserted_and_duplicates(client: AsyncClient):
     """POST /api/v1/news/refresh returns inserted and duplicates_skipped counts."""
-    mock_result = {"inserted": 5, "duplicates_skipped": 3}
+    mock_result = {**BASE_RESULT, "inserted": 5, "duplicates_skipped": 3}
     with patch(
         "app.api.endpoints.news.refresh_all_news",
         new_callable=AsyncMock,
@@ -28,29 +31,30 @@ async def test_news_refresh_returns_inserted_and_duplicates(client: AsyncClient)
         assert data["success"] is True
         assert data["inserted"] == 5
         assert data["duplicates_skipped"] == 3
+        assert data["deleted_low_relevance"] == 0
         assert "تم تحديث الأخبار" in data["message"]
 
 
 @pytest.mark.asyncio
 async def test_news_refresh_zero_inserts(client: AsyncClient):
     """POST /api/v1/news/refresh works when no new articles found."""
-    mock_result = {"inserted": 0, "duplicates_skipped": 0}
     with patch(
         "app.api.endpoints.news.refresh_all_news",
         new_callable=AsyncMock,
-        return_value=mock_result,
+        return_value=BASE_RESULT,
     ):
         resp = await client.post("/api/v1/news/refresh")
         assert resp.status_code == 200
         data = resp.json()
         assert data["inserted"] == 0
         assert data["duplicates_skipped"] == 0
+        assert data["deleted_low_relevance"] == 0
 
 
 @pytest.mark.asyncio
 async def test_news_refresh_all_duplicates(client: AsyncClient):
     """POST /api/v1/news/refresh handles all-duplicates case without crash."""
-    mock_result = {"inserted": 0, "duplicates_skipped": 10}
+    mock_result = {**BASE_RESULT, "duplicates_skipped": 10}
     with patch(
         "app.api.endpoints.news.refresh_all_news",
         new_callable=AsyncMock,
@@ -61,6 +65,22 @@ async def test_news_refresh_all_duplicates(client: AsyncClient):
         data = resp.json()
         assert data["inserted"] == 0
         assert data["duplicates_skipped"] == 10
+
+
+@pytest.mark.asyncio
+async def test_news_refresh_includes_deleted_count(client: AsyncClient):
+    """POST /api/v1/news/refresh includes deleted_low_relevance count."""
+    mock_result = {**BASE_RESULT, "inserted": 2, "deleted_low_relevance": 7}
+    with patch(
+        "app.api.endpoints.news.refresh_all_news",
+        new_callable=AsyncMock,
+        return_value=mock_result,
+    ):
+        resp = await client.post("/api/v1/news/refresh")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deleted_low_relevance"] == 7
+        assert "7" in data["message"] or "تم تحديث الأخبار" in data["message"]
 
 
 @pytest.mark.asyncio
@@ -75,3 +95,17 @@ async def test_news_refresh_backend_error(client: AsyncClient):
         assert resp.status_code == 500
         data = resp.json()
         assert "detail" in data
+
+
+@pytest.mark.asyncio
+async def test_news_refresh_zero_deleted_is_valid(client: AsyncClient):
+    """deleted_low_relevance=0 is a valid response (nothing to clean)."""
+    with patch(
+        "app.api.endpoints.news.refresh_all_news",
+        new_callable=AsyncMock,
+        return_value=BASE_RESULT,
+    ):
+        resp = await client.post("/api/v1/news/refresh")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deleted_low_relevance"] == 0

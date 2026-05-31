@@ -39,6 +39,7 @@ class NewsRefreshResponse(BaseModel):
     message: str
     inserted: int = 0
     duplicates_skipped: int = 0
+    deleted_low_relevance: int = 0
 
 
 class DebugSourceInfo(BaseModel):
@@ -113,6 +114,7 @@ async def refresh_news(
             message=f"تم تحديث الأخبار: {result['inserted']} مقال جديد، {result['duplicates_skipped']} مكرر",
             inserted=result["inserted"],
             duplicates_skipped=result["duplicates_skipped"],
+            deleted_low_relevance=result["deleted_low_relevance"],
         )
     except Exception as e:
         logger.exception(f"News refresh failed: {e}")
