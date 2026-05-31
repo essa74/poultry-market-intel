@@ -3,6 +3,9 @@ import traceback
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete, or_
+from pydantic import BaseModel, Field
+from datetime import date
+from typing import Optional
 from app.db.session import get_db, async_session
 from app.api.deps import require_admin_token
 from app.core.config import get_settings
@@ -153,3 +156,99 @@ async def reset_prices(_=Depends(require_admin_token)):
             "error": str(e),
             "traceback": traceback.format_exc(),
         }
+
+
+class ManualPriceEntry(BaseModel):
+    product_type: str = Field(default="fertilized_eggs", pattern=r"^(fertilized_eggs|day_old_chicks)$")
+    category: str = Field(..., pattern=r"^(white|sasso|baladi|local|duck|quail|turkey|ostrich)$")
+    raw_product_name: str = ""
+    price: float = Field(..., gt=0)
+    unit: str = Field(default="per_unit", pattern=r"^(per_unit|per_tray|per_ton)$")
+    source: str = "يدوي"
+    recorded_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+@router.post("/prices/manual")
+async def create_manual_price(entry: ManualPriceEntry, db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
+    from app.models import PriceRecord
+
+    try:
+        record_date = entry.recorded_date or date.today()
+        unit = entry.unit
+        if entry.product_type == "fertilized_eggs" and unit == "per_tray":
+            unit = "per_unit"
+        product_group = "fertilized_eggs" if entry.product_type == "fertilized_eggs" else "chicks"
+
+        record = PriceRecord(
+            product_type=entry.product_type,
+            category=entry.category,
+            price=entry.price,
+            currency="EGP",
+            unit=unit,
+            market="manual",
+            source=entry.source or "يدوي",
+            raw_product_name=entry.raw_product_name or None,
+            raw_post_text=entry.notes or None,
+            product_group=product_group,
+            recorded_date=record_date,
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+
+        return {"success": True, "id": record.id, "message": "تم حفظ السعر بنجاح"}
+
+    except Exception as e:
+        traceback.print_exc()
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+
+
+class BulkPriceEntry(BaseModel):
+    lines: str
+    source: str = "يدوي"
+    recorded_date: Optional[date] = None
+
+
+@router.post("/prices/bulk")
+async def create_bulk_prices(body: BulkPriceEntry, db: AsyncSession = Depends(get_db), _=Depends(require_admin_token)):
+    from app.models import PriceRecord
+    from app.services.scrapers.facebook_scraper import _parse_arabic_price_lines
+
+    try:
+        record_date = body.recorded_date or date.today()
+        parsed_lines, rejected_lines = _parse_arabic_price_lines(body.lines)
+
+        saved = 0
+        for pl in parsed_lines:
+            unit = pl.get("unit", "per_unit")
+            if pl["product_type"] == "fertilized_eggs" and unit == "per_tray":
+                unit = "per_unit"
+            record = PriceRecord(
+                product_type=pl["product_type"],
+                category=pl["category"],
+                price=pl["price"],
+                currency="EGP",
+                unit=unit,
+                market="manual",
+                source=body.source,
+                raw_product_name=pl["raw_line"],
+                product_group=pl["product_group"],
+                recorded_date=record_date,
+            )
+            db.add(record)
+            saved += 1
+
+        await db.commit()
+
+        return {
+            "success": True,
+            "saved_count": saved,
+            "failed_count": len(rejected_lines),
+            "failed_lines": rejected_lines[:20],
+            "message": f"تم حفظ {saved} سعر بنجاح",
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
