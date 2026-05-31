@@ -83,20 +83,34 @@ async def ocr_preview(
     recorded_date: Optional[str] = Form(None),
     _=Depends(require_admin_token),
 ):
-    from app.services.ocr_service import ocr_image
+    from app.services.ocr_service import ocr_image, validate_image
     from app.services.scrapers.facebook_scraper import _parse_arabic_price_lines
+
+    logger.info(f"OCR preview: content_type={image.content_type}, filename={image.filename}")
 
     if not image.content_type or not image.content_type.startswith("image/"):
         return {"success": False, "error": "يجب رفع ملف صورة (jpg/png/webp)"}
+
+    allowed = {"image/jpeg", "image/png", "image/webp"}
+    if image.content_type not in allowed:
+        return {"success": False, "error": f"صيغة الصورة غير مدعومة: {image.content_type}. الصيغ المدعومة: jpg, png, webp"}
 
     try:
         image_bytes = await image.read()
     except Exception as e:
         return {"success": False, "error": f"فشل قراءة الصورة: {e}"}
 
+    logger.info(f"OCR preview: image_size={len(image_bytes)} bytes")
+
+    valid, err = validate_image(image_bytes)
+    if not valid:
+        return {"success": False, "error": err}
+
     success, extracted_text, error = await ocr_image(image_bytes)
     if not success:
         return {"success": False, "error": error}
+
+    logger.info(f"OCR preview: extracted_text_length={len(extracted_text)}")
 
     parsed_items, rejected_lines = _parse_arabic_price_lines(extracted_text)
 

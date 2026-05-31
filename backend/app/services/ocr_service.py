@@ -1,7 +1,6 @@
+import io
 import logging
 import shutil
-import tempfile
-from pathlib import Path
 from typing import Optional
 
 from PIL import Image
@@ -22,6 +21,19 @@ def _arabic_lang_available() -> bool:
         return False
 
 
+def validate_image(image_bytes: bytes) -> tuple[bool, Optional[str]]:
+    if not image_bytes:
+        return False, "الملف فارغ"
+    if len(image_bytes) < 100:
+        return False, "الملف صغير جداً أو تالف"
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img.verify()
+        return True, None
+    except Exception:
+        return False, "تعذر التعرف على الصورة — تأكد من رفع ملف صورة صحيح (jpg/png/webp)"
+
+
 async def ocr_image(image_bytes: bytes) -> tuple[bool, str, Optional[str]]:
     """
     Run OCR on image bytes, trying Arabic first, then falling back to any language.
@@ -38,17 +50,16 @@ async def ocr_image(image_bytes: bytes) -> tuple[bool, str, Optional[str]]:
     except ImportError:
         return False, "", "OCR غير متاح حالياً على السيرفر (pytesseract not installed)"
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        tmp_path = tmp.name
-        try:
-            img = Image.open(tmp)
-            img.save(tmp_path)
-        except Exception:
-            pass
+    valid, err = validate_image(image_bytes)
+    if not valid:
+        return False, "", err
 
     try:
-        img = Image.open(tmp_path)
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception as e:
+        return False, "", f"تعذر فتح الصورة: {e}"
 
+    try:
         if _arabic_lang_available():
             text = pytesseract.image_to_string(img, lang="ara", config="--psm 6")
         else:
@@ -60,11 +71,9 @@ async def ocr_image(image_bytes: bytes) -> tuple[bool, str, Optional[str]]:
         if not text:
             return False, "", "لم يتم استخراج أي نص من الصورة"
 
+        logger.info(f"OCR success: extracted {len(text)} chars")
         return True, text, None
 
     except Exception as e:
         logger.exception(f"OCR failed: {e}")
         return False, "", f"فشل التعرف على النص: {e}"
-
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
