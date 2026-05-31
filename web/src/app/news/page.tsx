@@ -164,14 +164,33 @@ export default function NewsPage() {
   });
 
   const refreshMutation = useMutation({
-    mutationFn: () => fetchJson<{ message: string }>(`${getApiBase()}/news/refresh`, {
-      method: "POST",
-    } as RequestInit),
-    onSuccess: (res) => {
-      toast.success(res.message);
-      queryClient.invalidateQueries({ queryKey: ["news"] });
+    mutationFn: async () => {
+      console.log("news refresh clicked");
+      const url = `${getApiBase()}/news/refresh`;
+      const res = await fetch(url, { method: "POST" });
+      console.log("news refresh response status:", res.status);
+      const body = await res.json();
+      console.log("news refresh response body:", body);
+      if (!res.ok) {
+        throw new Error(body?.detail || body?.message || `HTTP ${res.status}`);
+      }
+      return body as { message: string };
     },
-    onError: (err: Error) => toast.error(err.message),
+    onSuccess: (res) => {
+      console.log("news refresh success:", res.message);
+      toast.success(res.message);
+      console.log("news queries invalidated");
+      queryClient.invalidateQueries({ queryKey: ["news"], refetchType: "all" });
+      queryClient.refetchQueries({ queryKey: ["news"] });
+      setTimeout(() => {
+        console.log("news refresh fallback reload");
+        window.location.reload();
+      }, 3000);
+    },
+    onError: (err: Error) => {
+      console.error("news refresh error:", err.message);
+      toast.error(err.message);
+    },
   });
 
   return (
@@ -204,14 +223,19 @@ export default function NewsPage() {
         <p className="text-xs text-gray-500">
           {data?.length ? `عدد المقالات: ${data.length}` : ""}
         </p>
-        <button
-          onClick={() => refreshMutation.mutate()}
-          disabled={refreshMutation.isPending}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors disabled:opacity-40"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-          {refreshMutation.isPending ? "جاري التحديث..." : "تحديث الأخبار"}
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-gray-700 font-mono hidden md:inline" dir="ltr">
+            API: {getApiBase()}/news/refresh
+          </span>
+          <button
+            onClick={() => { console.log("news refresh button clicked"); refreshMutation.mutate(); }}
+            disabled={refreshMutation.isPending}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors disabled:opacity-40"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+            {refreshMutation.isPending ? "جاري التحديث..." : "تحديث الأخبار"}
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

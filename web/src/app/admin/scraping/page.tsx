@@ -312,6 +312,12 @@ export default function AdminScrapingPage() {
         </div>
       </div>
 
+      <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/5">
+        <p className="text-xs text-gray-500 leading-relaxed">
+          المصادر المفضلة: جوجل نيوز (RSS) لأخبار الدواجن والأسعار — يُفضل الاعتماد على المصادر الإخبارية المعروفة مثل المال، اليوم السابع، مصراوي، ووزارة الزراعة. الأخبار تُصفّى تلقائياً حسب الصلة (≥75%).
+        </p>
+      </div>
+
       {showTokenPrompt && (
         <GlassCard glow="gold" hover={false} className="mb-4">
           <div className="flex items-center gap-3 flex-wrap">

@@ -12,10 +12,8 @@ import {
   Egg,
   ChevronLeft,
   X,
-  Shield,
   Home,
   PenLine,
-  HardDrive,
 } from "lucide-react";
 import { useState } from "react";
 import { ar } from "@/lib/ar";
@@ -126,25 +124,15 @@ export default function Sidebar() {
             </motion.div>
           </Link>
 
-          <Link href="/admin/scraping" onClick={() => setMobileOpen(false)}>
-            <motion.div
-              whileHover={{ x: -2 }}
-              whileTap={{ scale: 0.98 }}
-              className={`sidebar-link group ${pathname === "/admin/scraping" ? "active" : ""}`}
-            >
-              <HardDrive className={`w-5 h-5 transition-colors ${pathname === "/admin/scraping" ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"}`} />
-              <span className="flex-1">إدارة المصادر</span>
-              {pathname === "/admin/scraping" && (
-                <motion.div layoutId="activeNav" className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              )}
-            </motion.div>
-          </Link>
         </nav>
 
         {/* BrandCredit — absolute bottom of sidebar = far bottom-right of viewport in RTL */}
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none">
+        <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none">
           <div className="pointer-events-auto">
             <BrandCredit variant="footer" />
+          </div>
+          <div className="pointer-events-auto text-[10px] text-gray-700/60 font-mono">
+            build: admin-prices-v2
           </div>
         </div>
       </aside>
