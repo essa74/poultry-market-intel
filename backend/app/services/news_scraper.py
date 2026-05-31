@@ -9,6 +9,7 @@ import feedparser
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models import NewsArticle
 
@@ -217,9 +218,10 @@ def extract_article_info(
     return {"title": title, "url": href, "summary": summary}
 
 
-async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[SourceDebugInfo] = None) -> int:
+async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[SourceDebugInfo] = None) -> tuple[int, int]:
     url = source["url"]
-    parsed_count = 0
+    inserted = 0
+    duplicates = 0
 
     try:
         feed = feedparser.parse(url)
@@ -228,7 +230,7 @@ async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[Source
         logger.warning(f"{source['name']}: {msg}")
         if debug:
             debug.errors.append(msg)
-        return 0
+        return 0, 0
 
     if debug:
         debug.status_code = 200
@@ -264,19 +266,10 @@ async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[Source
                 debug.rejection_reasons.append({"title": title[:80], "reason": f"low relevance ({relevance})"})
             continue
 
-        existing = await db.execute(
-            select(NewsArticle).where(NewsArticle.url == link)
-        )
-        if existing.first():
-            if debug:
-                debug.rejected_count += 1
-                debug.rejection_reasons.append({"title": title[:80], "reason": "duplicate URL"})
-            continue
-
         category = classify_category(title, summary)
         sentiment = compute_sentiment(title, summary)
 
-        article = NewsArticle(
+        stmt = pg_insert(NewsArticle).values(
             title=title[:500],
             summary=summary[:500] if summary else None,
             url=link[:1000],
@@ -287,12 +280,16 @@ async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[Source
             relevance_score=relevance,
             sentiment=sentiment,
         )
-        db.add(article)
-        parsed_count += 1
+        stmt = stmt.on_conflict_do_nothing(index_elements=["url"])
+        result = await db.execute(stmt)
+        if result.rowcount:
+            inserted += 1
+        else:
+            duplicates += 1
         if debug:
             debug.sample_titles.append(f"[{relevance}] {title[:60]}")
 
-    if parsed_count:
+    if inserted:
         try:
             await db.commit()
         except Exception as e:
@@ -300,22 +297,24 @@ async def scrape_rss_feed(source: dict, db: AsyncSession, debug: Optional[Source
             await db.rollback()
             if debug:
                 debug.errors.append(f"DB commit error: {e}")
-            return 0
-        logger.info(f"News: {parsed_count} new articles from {source['name']} (RSS)")
+            return 0, 0
+        logger.info(f"News: {inserted} new, {duplicates} duplicates from {source['name']} (RSS)")
 
     if debug:
-        debug.accepted_count = parsed_count
+        debug.accepted_count = inserted
 
-    return parsed_count
+    return inserted, duplicates
 
 
-async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDebugInfo] = None) -> int:
+async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDebugInfo] = None) -> tuple[int, int]:
     url = source["url"]
     parsed_count = 0
 
     if source.get("type") == "rss":
         return await scrape_rss_feed(source, db, debug)
 
+    inserted = 0
+    duplicates = 0
     resp = None
     try:
         async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
@@ -331,7 +330,7 @@ async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDe
                 code = resp.status_code
             debug.status_code = code or 0
             debug.errors.append(msg)
-        return 0
+        return 0, 0
 
     html_len = len(resp.text)
     logger.info(f"{source['name']}: HTTP {resp.status_code}, HTML length {html_len}")
@@ -347,7 +346,7 @@ async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDe
         logger.warning(f"{source['name']}: {msg}")
         if debug:
             debug.errors.append(msg)
-        return 0
+        return 0, 0
 
     base_url = f"{resp.url.scheme}://{resp.url.host}"
     elements = soup.select(source["selector"]) if source.get("selector") else [soup]
@@ -371,19 +370,10 @@ async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDe
                 debug.rejection_reasons.append({"title": info["title"][:80], "reason": f"low relevance ({relevance})"})
             continue
 
-        existing = await db.execute(
-            select(NewsArticle).where(NewsArticle.url == info["url"])
-        )
-        if existing.first():
-            if debug:
-                debug.rejected_count += 1
-                debug.rejection_reasons.append({"title": info["title"][:80], "reason": "duplicate URL"})
-            continue
-
         category = classify_category(info["title"], info.get("summary", ""))
         sentiment = compute_sentiment(info["title"], info.get("summary", ""))
 
-        article = NewsArticle(
+        stmt = pg_insert(NewsArticle).values(
             title=info["title"][:500],
             summary=info.get("summary", "")[:500] if info.get("summary") else None,
             url=info["url"][:1000],
@@ -394,12 +384,16 @@ async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDe
             relevance_score=relevance,
             sentiment=sentiment,
         )
-        db.add(article)
-        parsed_count += 1
+        stmt = stmt.on_conflict_do_nothing(index_elements=["url"])
+        result = await db.execute(stmt)
+        if result.rowcount:
+            inserted += 1
+        else:
+            duplicates += 1
         if debug:
             debug.sample_titles.append(f"[{relevance}] {info['title'][:60]}")
 
-    if parsed_count:
+    if inserted:
         try:
             await db.commit()
         except Exception as e:
@@ -407,13 +401,13 @@ async def scrape_source(source: dict, db: AsyncSession, debug: Optional[SourceDe
             await db.rollback()
             if debug:
                 debug.errors.append(f"DB commit error: {e}")
-            return 0
-        logger.info(f"News: {parsed_count} new articles from {source['name']}")
+            return 0, 0
+        logger.info(f"News: {inserted} new, {duplicates} duplicates from {source['name']}")
 
     if debug:
-        debug.accepted_count = parsed_count
+        debug.accepted_count = inserted
 
-    return parsed_count
+    return inserted, duplicates
 
 
 NEWS_SOURCES = [
@@ -488,14 +482,16 @@ async def cleanup_low_relevance(db: AsyncSession) -> int:
     return deleted
 
 
-async def refresh_all_news(db: AsyncSession) -> int:
+async def refresh_all_news(db: AsyncSession) -> dict:
     await cleanup_low_relevance(db)
-    total = 0
+    total_inserted = 0
+    total_duplicates = 0
     for source in NEWS_SOURCES:
-        count = await scrape_source(source, db)
-        total += count
-    logger.info(f"News refresh complete: {total} new articles total")
-    return total
+        ins, dup = await scrape_source(source, db)
+        total_inserted += ins
+        total_duplicates += dup
+    logger.info(f"News refresh complete: {total_inserted} new, {total_duplicates} duplicates total")
+    return {"inserted": total_inserted, "duplicates_skipped": total_duplicates}
 
 
 async def refresh_all_news_debug(db: AsyncSession) -> tuple[int, list[dict]]:
@@ -504,8 +500,8 @@ async def refresh_all_news_debug(db: AsyncSession) -> tuple[int, list[dict]]:
     debug_results = []
     for source in NEWS_SOURCES:
         debug = SourceDebugInfo(source["name"], source["url"])
-        count = await scrape_source(source, db, debug)
-        total += count
+        ins, _ = await scrape_source(source, db, debug)
+        total += ins
         debug_results.append(debug.to_dict())
     logger.info(f"News refresh complete: {total} new articles (cleaned {cleaned} old)")
     return total, debug_results

@@ -1,7 +1,5 @@
 import logging
-import traceback as tb
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
@@ -37,9 +35,10 @@ class NewsArticleResponse(BaseModel):
 
 
 class NewsRefreshResponse(BaseModel):
+    success: bool = True
     message: str
-    new_articles: int
-    source: str = "news_scraper"
+    inserted: int = 0
+    duplicates_skipped: int = 0
 
 
 class DebugSourceInfo(BaseModel):
@@ -109,22 +108,15 @@ async def refresh_news(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        count = await refresh_all_news(db)
+        result = await refresh_all_news(db)
         return NewsRefreshResponse(
-            message=f"تم تحديث الأخبار: {count} مقال جديد",
-            new_articles=count,
+            message=f"تم تحديث الأخبار: {result['inserted']} مقال جديد، {result['duplicates_skipped']} مكرر",
+            inserted=result["inserted"],
+            duplicates_skipped=result["duplicates_skipped"],
         )
     except Exception as e:
-        tb_str = "".join(tb.format_exception(type(e), e, e.__traceback__))
-        logger.error(f"News refresh failed: {e}\n{tb_str}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "error": str(e),
-                "traceback": tb_str,
-            },
-        )
+        logger.exception(f"News refresh failed: {e}")
+        raise HTTPException(status_code=500, detail=f"News refresh failed: {e}")
 
 
 @router.get("/debug", response_model=NewsDebugResponse)

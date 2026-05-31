@@ -76,8 +76,8 @@ async def news_refresh_job():
     logger.info("=== News refresh job started ===")
     try:
         async with async_session() as db:
-            count = await refresh_all_news(db)
-            logger.info(f"News refresh: {count} new articles")
+            result = await refresh_all_news(db)
+            logger.info(f"News refresh: {result['inserted']} new, {result['duplicates_skipped']} duplicates")
     except Exception as e:
         logger.warning(f"News refresh failed: {e}")
 
