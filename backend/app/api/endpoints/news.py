@@ -1,4 +1,7 @@
+import logging
+import traceback as tb
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
@@ -9,6 +12,8 @@ from app.models import NewsArticle
 from app.services.news_scraper import (
     refresh_all_news, refresh_all_news_debug, get_market_indicators,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -99,15 +104,27 @@ async def latest_news(
     return result.scalars().all()
 
 
-@router.post("/refresh", response_model=NewsRefreshResponse)
+@router.post("/refresh")
 async def refresh_news(
     db: AsyncSession = Depends(get_db),
 ):
-    count = await refresh_all_news(db)
-    return NewsRefreshResponse(
-        message=f"تم تحديث الأخبار: {count} مقال جديد",
-        new_articles=count,
-    )
+    try:
+        count = await refresh_all_news(db)
+        return NewsRefreshResponse(
+            message=f"تم تحديث الأخبار: {count} مقال جديد",
+            new_articles=count,
+        )
+    except Exception as e:
+        tb_str = "".join(tb.format_exception(type(e), e, e.__traceback__))
+        logger.error(f"News refresh failed: {e}\n{tb_str}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e),
+                "traceback": tb_str,
+            },
+        )
 
 
 @router.get("/debug", response_model=NewsDebugResponse)

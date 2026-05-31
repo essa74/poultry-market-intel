@@ -166,7 +166,8 @@ export default function NewsPage() {
   const refreshMutation = useMutation({
     mutationFn: async () => {
       console.log("news refresh clicked");
-      const url = `${getApiBase()}/news/refresh`;
+      const url = `/api/v1/news/refresh`;
+      console.log("news refresh URL:", url);
       const res = await fetch(url, { method: "POST" });
       console.log("news refresh response status:", res.status);
       const body = await res.json();
@@ -225,7 +226,7 @@ export default function NewsPage() {
         </p>
         <div className="flex items-center gap-3">
           <span className="text-[10px] text-gray-700 font-mono hidden md:inline" dir="ltr">
-            API: {getApiBase()}/news/refresh
+            API: /api/v1/news/refresh (proxy)
           </span>
           <button
             onClick={() => { console.log("news refresh button clicked"); refreshMutation.mutate(); }}
