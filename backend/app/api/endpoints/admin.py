@@ -86,6 +86,7 @@ async def ocr_preview(
     from app.services.ocr_service import ocr_image, validate_image
     from app.services.scrapers.facebook_scraper import _parse_arabic_price_lines
     from app.services.chick_poster_parser import parse_chick_poster_text, _is_chick_poster
+    from app.services.region_detection import detect_regions
 
     logger.info(f"OCR preview: content_type={image.content_type}, filename={image.filename}")
 
@@ -114,9 +115,16 @@ async def ocr_preview(
     logger.info(f"OCR preview: extracted_text_length={len(extracted_text)}")
 
     egg_items, egg_rejected = _parse_arabic_price_lines(extracted_text)
-    chick_items, chick_rejected = [], []
+    chick_items = []
+    region_items = []
+    use_region = False
+
     if not egg_items or _is_chick_poster(extracted_text):
         chick_items, chick_rejected = parse_chick_poster_text(extracted_text)
+
+    if not egg_items and not chick_items:
+        region_items = await detect_regions(image_bytes)
+        use_region = bool(region_items)
 
     items = []
     rejected_lines = egg_rejected[:20]
@@ -132,9 +140,13 @@ async def ocr_preview(
                 "unit": unit,
                 "confidence": ci.get("confidence", "medium"),
                 "confidence_reason": ci.get("confidence_reason", ""),
+                "extraction_method": "chick_text",
             })
         if chick_rejected:
             rejected_lines.extend(chick_rejected[:10])
+    elif use_region:
+        for ri in region_items:
+            items.append(ri)
     else:
         for pl in egg_items:
             unit = pl.get("unit", "per_unit")
@@ -148,6 +160,7 @@ async def ocr_preview(
                 "unit": unit,
                 "confidence": "high",
                 "confidence_reason": "parsed from text",
+                "extraction_method": "table_ocr",
             })
 
     result = {

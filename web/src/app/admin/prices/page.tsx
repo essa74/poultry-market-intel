@@ -73,6 +73,7 @@ interface OcrItem {
   unit: string;
   confidence?: string;
   confidence_reason?: string;
+  extraction_method?: string;
 }
 
 export default function AdminPricesPage() {
@@ -570,6 +571,7 @@ export default function AdminPricesPage() {
                             <th className="text-left px-2 py-1">السعر</th>
                             <th className="text-center px-2 py-1">الوحدة</th>
                             <th className="text-center px-2 py-1">الدقة</th>
+                            <th className="text-center px-2 py-1">الطريقة</th>
                             <th className="text-center px-2 py-1"></th>
                           </tr>
                         </thead>
@@ -634,6 +636,21 @@ export default function AdminPricesPage() {
                                 {item.confidence_reason && (
                                   <span className="block text-[9px] text-gray-500 mt-0.5" title={item.confidence_reason}>{item.confidence_reason.slice(0, 30)}</span>
                                 )}
+                              </td>
+                              <td className="px-2 py-1 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  item.extraction_method === "region_detection"
+                                    ? "bg-blue-500/20 text-blue-400"
+                                    : item.extraction_method === "chick_text"
+                                    ? "bg-purple-500/20 text-purple-400"
+                                    : "bg-gray-500/20 text-gray-400"
+                                }`}>
+                                  {item.extraction_method === "region_detection"
+                                    ? "منطقة"
+                                    : item.extraction_method === "chick_text"
+                                    ? "نص"
+                                    : "جدول"}
+                                </span>
                               </td>
                               <td className="px-2 py-1 text-center">
                                 <button
