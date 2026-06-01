@@ -71,6 +71,8 @@ interface OcrItem {
   raw_product_name: string;
   price: number;
   unit: string;
+  confidence?: string;
+  confidence_reason?: string;
 }
 
 export default function AdminPricesPage() {
@@ -99,6 +101,7 @@ export default function AdminPricesPage() {
   const [ocrItems, setOcrItems] = useState<OcrItem[]>([]);
   const [rejectedLines, setRejectedLines] = useState<string[]>([]);
   const [showOcrPreview, setShowOcrPreview] = useState(false);
+  const [ocrFallbackMessage, setOcrFallbackMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Common
@@ -164,6 +167,7 @@ export default function AdminPricesPage() {
         setOcrItems(data.parsed_items || []);
         setRejectedLines(data.rejected_lines || []);
         setShowOcrPreview(true);
+        setOcrFallbackMessage(data.message || null);
         toast.success(`تم استخراج ${data.parsed_items.length} سعر`);
       } else {
         toast.error(data.error || "فشل التعرف على الصورة");
@@ -185,8 +189,9 @@ export default function AdminPricesPage() {
         setOcrItems([]);
         setExtractedText(null);
         setShowOcrPreview(false);
-        setOcrImage(null);
-        setOcrPreviewUrl(null);
+    setOcrImage(null);
+    setOcrPreviewUrl(null);
+    setOcrFallbackMessage(null);
         setShowDashboardLink(true);
         queryClient.invalidateQueries({ queryKey: ["prices"] });
       } else {
@@ -227,6 +232,7 @@ export default function AdminPricesPage() {
     setExtractedText(null);
     setOcrItems([]);
     setRejectedLines([]);
+    setOcrFallbackMessage(null);
   }
 
   function handleOcrPreview() {
@@ -540,10 +546,19 @@ export default function AdminPricesPage() {
                   </div>
                 )}
 
+                {ocrFallbackMessage && ocrItems.length === 0 && (
+                  <div className="p-4 rounded-lg bg-gold-500/10 border border-gold-500/30">
+                    <p className="text-sm text-gold-400">{ocrFallbackMessage}</p>
+                  </div>
+                )}
+
                 {ocrItems.length > 0 && (
                   <div>
                     <label className="block text-xs text-gray-400 mb-2">
                       الأسعار المستخرجة — {ocrItems.length} سعر:
+                      {ocrItems.some((it) => it.confidence === "low") && (
+                        <span className="text-gold-400 mr-2">(تتطلب مراجعة)</span>
+                      )}
                     </label>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
@@ -554,12 +569,15 @@ export default function AdminPricesPage() {
                             <th className="text-right px-2 py-1">الوصف</th>
                             <th className="text-left px-2 py-1">السعر</th>
                             <th className="text-center px-2 py-1">الوحدة</th>
+                            <th className="text-center px-2 py-1">الدقة</th>
                             <th className="text-center px-2 py-1"></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {ocrItems.map((item, i) => (
-                            <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                          {ocrItems.map((item, i) => {
+                            const isLow = item.confidence === "low";
+                            return (
+                            <tr key={i} className={`border-b border-white/5 hover:bg-white/5 ${isLow ? "bg-gold-500/5" : ""}`}>
                               <td className="px-2 py-1">
                                 <select
                                   value={item.product_type}
@@ -604,6 +622,20 @@ export default function AdminPricesPage() {
                                 {item.unit === "per_unit" ? "للقطعة" : item.unit}
                               </td>
                               <td className="px-2 py-1 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  item.confidence === "high"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : item.confidence === "medium"
+                                    ? "bg-gold-500/20 text-gold-400"
+                                    : "bg-red-500/20 text-red-400"
+                                }`}>
+                                  {item.confidence === "high" ? "عالية" : item.confidence === "medium" ? "متوسطة" : "منخفضة"}
+                                </span>
+                                {item.confidence_reason && (
+                                  <span className="block text-[9px] text-gray-500 mt-0.5" title={item.confidence_reason}>{item.confidence_reason.slice(0, 30)}</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1 text-center">
                                 <button
                                   onClick={() => removeOcrItem(i)}
                                   className="text-red-400 hover:text-red-300 transition-colors"
@@ -612,7 +644,8 @@ export default function AdminPricesPage() {
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -621,6 +654,9 @@ export default function AdminPricesPage() {
 
                 {ocrItems.length > 0 && (
                   <div className="flex justify-start">
+                    {ocrItems.some((it) => it.confidence === "low") && (
+                      <p className="text-xs text-gold-400 mr-4 self-center">توجد أسعار بدقة منخفضة — يرجى مراجعتها قبل الحفظ</p>
+                    )}
                     <button
                       type="button"
                       onClick={handleOcrSave}

@@ -85,6 +85,7 @@ async def ocr_preview(
 ):
     from app.services.ocr_service import ocr_image, validate_image
     from app.services.scrapers.facebook_scraper import _parse_arabic_price_lines
+    from app.services.chick_poster_parser import parse_chick_poster_text, _is_chick_poster
 
     logger.info(f"OCR preview: content_type={image.content_type}, filename={image.filename}")
 
@@ -112,27 +113,54 @@ async def ocr_preview(
 
     logger.info(f"OCR preview: extracted_text_length={len(extracted_text)}")
 
-    parsed_items, rejected_lines = _parse_arabic_price_lines(extracted_text)
+    egg_items, egg_rejected = _parse_arabic_price_lines(extracted_text)
+    chick_items, chick_rejected = [], []
+    if not egg_items or _is_chick_poster(extracted_text):
+        chick_items, chick_rejected = parse_chick_poster_text(extracted_text)
 
     items = []
-    for pl in parsed_items:
-        unit = pl.get("unit", "per_unit")
-        if pl["product_type"] == "fertilized_eggs" and unit == "per_tray":
-            unit = "per_unit"
-        items.append({
-            "product_type": pl["product_type"],
-            "category": pl["category"],
-            "raw_product_name": pl["raw_line"],
-            "price": pl["price"],
-            "unit": unit,
-        })
+    rejected_lines = egg_rejected[:20]
 
-    return {
+    if chick_items:
+        for ci in chick_items:
+            unit = ci.get("unit", "per_unit")
+            items.append({
+                "product_type": ci["product_type"],
+                "category": ci["category"],
+                "raw_product_name": ci["raw_product_name"],
+                "price": ci["price"],
+                "unit": unit,
+                "confidence": ci.get("confidence", "medium"),
+                "confidence_reason": ci.get("confidence_reason", ""),
+            })
+        if chick_rejected:
+            rejected_lines.extend(chick_rejected[:10])
+    else:
+        for pl in egg_items:
+            unit = pl.get("unit", "per_unit")
+            if pl["product_type"] == "fertilized_eggs" and unit == "per_tray":
+                unit = "per_unit"
+            items.append({
+                "product_type": pl["product_type"],
+                "category": pl["category"],
+                "raw_product_name": pl["raw_line"],
+                "price": pl["price"],
+                "unit": unit,
+                "confidence": "high",
+                "confidence_reason": "parsed from text",
+            })
+
+    result = {
         "success": True,
         "extracted_text": extracted_text,
         "parsed_items": items,
-        "rejected_lines": rejected_lines[:20],
+        "rejected_lines": rejected_lines[:30],
     }
+
+    if not items:
+        result["message"] = "لم يتم استخراج أسعار تلقائياً — يمكنك نسخ النص أو إدخال الأسعار يدوياً"
+
+    return result
 
 
 class OcrSaveItem(BaseModel):
