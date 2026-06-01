@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libatspi2.0-0 \
+    libglib2.0-0 \
     tesseract-ocr \
     tesseract-ocr-ara \
     libtesseract-dev \

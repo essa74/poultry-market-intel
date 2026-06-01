@@ -2,16 +2,26 @@
 Smart region detection for complex poultry price poster images using OpenCV.
 Detects high-contrast price cards/circles, crops regions, runs numeric OCR,
 and matches nearby Arabic labels to known breeds.
+
+OpenCV is optional. If unavailable, detect_regions returns an empty list.
 """
 import io
 import logging
-from typing import Optional
+from typing import Optional, Any
 
-import cv2
-import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+try:
+    import cv2
+    import numpy as np
+    CV2_AVAILABLE = True
+except ImportError:
+    cv2 = None
+    np = None
+    CV2_AVAILABLE = False
+    logger.info("OpenCV not available — region detection will be skipped")
 
 CHICK_BREED_MAP: dict[str, str] = {
     "أبيض شركات": "white",
@@ -40,7 +50,7 @@ def _normalize_all_digits(text: str) -> str:
     return text
 
 
-def _is_card_contour(contour, img_area: int, scale: float) -> bool:
+def _is_card_contour(contour: Any, img_area: int, scale: float) -> bool:
     """Check if a contour looks like a price card (circular or rectangular, not too small/large)."""
     x, y, w, h = cv2.boundingRect(contour)
     area = cv2.contourArea(contour)
@@ -60,7 +70,7 @@ def _is_card_contour(contour, img_area: int, scale: float) -> bool:
 
 
 def _find_nearby_text(
-    img: np.ndarray,
+    img: Any,
     cx: int,
     cy: int,
     region_w: int,
@@ -100,7 +110,7 @@ def _match_breed_in_text(text: str) -> Optional[tuple[str, str]]:
     return None
 
 
-def _extract_price_from_roi(roi: np.ndarray) -> Optional[float]:
+def _extract_price_from_roi(roi: Any) -> Optional[float]:
     """Run numeric OCR on a cropped region to extract a price."""
     import pytesseract
 
@@ -126,6 +136,10 @@ async def detect_regions(image_bytes: bytes) -> list[dict]:
     Returns list of dicts with: product_type, category, raw_product_name,
     price, unit, confidence, confidence_reason, extraction_method.
     """
+    if not CV2_AVAILABLE:
+        logger.info("Region detection skipped: OpenCV not available")
+        return []
+
     try:
         import pytesseract
     except ImportError:
